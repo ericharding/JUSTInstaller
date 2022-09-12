@@ -1,3 +1,3 @@
 #!/bin/bash
 
-dotnet build test/InstallMe
+dotnet build
