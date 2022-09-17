@@ -1,2 +1,13 @@
-﻿// See https://aka.ms/new-console-template for more information
-Console.WriteLine("Hello, World!");
+﻿using JUSTInstaller;
+
+
+JUSTInstaller.Installer.Test();
+
+main();
+
+static void main()
+{
+    // Installer installer = new(new Config("InstallMe", "");
+}
+
+
