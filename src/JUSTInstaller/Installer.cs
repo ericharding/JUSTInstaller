@@ -18,8 +18,10 @@ public record class InstallerConfig(
     string InstallPathTemplate,
     Uri CurrentVersionUri,
     string UpdateLocationTemplate,
-    IEnumerable<string> WindowsShortcutPaths,
-    IEnumerable<string> SymlinksPaths);
+    string PostInstall = null,
+    IEnumerable<string>? WindowsShortcutPaths = null,
+    IEnumerable<string>? SymlinksPaths = null
+    );
 
 public class Installer
 {

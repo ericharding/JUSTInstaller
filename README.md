@@ -9,6 +9,10 @@ Cross platform installer that values sipmlicity.
 * EntryPoint  
     The name of the executable or script that starts the application. Should **not** include the install path. If the name you give does not exist after unzipping the package '.exe' is appended.
 
+* PostInstall  
+    The name of an executable to run directly after install. Like EntryPoint, `.exe` will be appended as necessary.
+
+
 * InstallPathTemplate  
     Where on the filesystem you want the application to be installed. For example `~/.apps/myApp_{version}/` or `c:/program files/MyApp/MyApp_v{version}`
 
@@ -27,9 +31,9 @@ Cross platform installer that values sipmlicity.
 
 # Recipes / FAQ
 
-## I want to install on multiple platforms
+## I want to install on multiple platforms!
 
-When you name your archives append a platform specific suffix. Then configure your installer with the same version URI and detect the current platform when setting your download URI.
+Sure! When you name your archives append a platform specific suffix. Then configure your installer with the same version URI and detect the current platform when setting your download URI.
 ```csharp
 var platform = System.Environment.OSVersion.Platform switch {
             PlatformID.Unix => "nix",
@@ -40,5 +44,12 @@ config.UpdateLocationTemplate = $"https://example.com/downloads/myapp_{{version}
 
 ## Hey! Why doesn't this installer force you to install into the standard, recommended, install locations? 
 
-It does. You just have to specify where that is.
+It does, man. You just have to tell it where that is.
 
+## I changed my shortcuts and I need this version to remove the old shortcut location
+
+No built in support but you could use `PostInstall`.
+
+## Can PostInstall be a script?
+
+Yes. Just be careful if you're installing on multiple platforms. 
