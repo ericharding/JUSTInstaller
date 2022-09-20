@@ -20,6 +20,7 @@ public record class InstallerConfig(
     string UpdateLocationTemplate,
     IEnumerable<string> WindowsShortcutPaths,
     IEnumerable<string> SymlinksPaths);
+
 public class Installer
 {
     public Installer(InstallerConfig config)
