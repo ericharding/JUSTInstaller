@@ -1,7 +1,7 @@
 ﻿using JUSTInstaller;
 
 
-JUSTInstaller.Installer.Test();
+// JUSTInstaller.Installer.Test();
 
 main();
 
