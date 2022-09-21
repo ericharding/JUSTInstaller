@@ -52,4 +52,9 @@ No built in support but you could use `PostInstall`.
 
 ## Can PostInstall be a script?
 
-Yes. Just be careful if you're installing on multiple platforms. 
+Sure. Just be careful if you're installing on multiple platforms. 
+
+## I'd like to be able to uninstall my app using my favorite system control panel applet.
+
+I'd like a pony.
+
