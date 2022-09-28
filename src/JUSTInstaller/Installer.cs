@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using System.IO;
+using System.IO.Compression;
 
 namespace JUSTInstaller;
 
@@ -8,17 +9,14 @@ namespace JUSTInstaller;
 // symlink paths
 
 
-// NOTE: if you want environment variables in your instal path do it yourself
-// Entrypoint: Name of the main executable. .exe is automatically added on Windows if not specified
-// InstallPathTemplate - local directory to install. i.e. ~/.apps/myApp{version}.  Requires {version} and will expand ~ to the current user's home directory
-// CurrentVersionUri - absolute url to check the current version. Must return a version in the form of 
-//    <major>[.minor][.revision] [hash]
 public record class InstallerConfig(
-    string EntryPoint,
-    string InstallPathTemplate,
-    Uri CurrentVersionUri,
-    string UpdateLocationTemplate,
-    string? PostInstall = null,
+    string EntryPoint,  // Application entrypoint
+    string InstallBasePath, // Root path where different versions get installed. A version.txt will be created here.
+    string InstallFolderTemplate, // Name of the installed app folder relative to InstallFolderbase. Must include {version}
+    Uri CurrentVersionUri, // where to check for a new version
+    string UpdateLocationTemplate, // Where to get the new zip
+    Version? CurrentVersion = null, // If null we use the version from assemblyinfo
+    uint KeepVersion = 2, // How many old version to keep
     IEnumerable<string>? WindowsShortcutPaths = null,
     IEnumerable<string>? SymlinksPaths = null
     );
@@ -28,17 +26,22 @@ public class Installer
     private InstallerConfig _config;
 
     public Installer(InstallerConfig config) {
-        _config = config;
-        UpdateCurrentVersion();
+        _config = config.ExpandUser().EnsureVersion();
+        ValidateConfig(_config)?.Throw();
     }
 
     public bool IsInstalled => CurrentVersion != null;
-    public Version? CurrentVersion { get; init; }
+    public Version? CurrentVersion => _config.CurrentVersion;
+
+    public Version? AvailableVersion { get; set; }
+
+    public event Action<string>? OnError;
 
     public async Task<bool> CheckforUpdate() {
-        var stream = await Utils.DownloadFileAsync(_config.CurrentVersionUri);
-        var data = await stream.ReadToEndAsync();
+        var reader = new StreamReader(await Utils.DownloadFileAsync(_config.CurrentVersionUri));
+        var data = await reader.ReadToEndAsync();
         var newVersion = parseVersionFromString(data);
+        AvailableVersion = newVersion;
         if (newVersion == null) {
             log_error($"Could not parse version from '{data}'");
             return false;
@@ -49,17 +52,77 @@ public class Installer
         return false;
     }
 
+    public class InstalledVersion {
+        public Version Version { get; init; }
+        // Path to the newly isntalled executable if you want to run it manually
+        public string EntryPoint { get; init; }
+    };
+
+    // Returns the installed version (if successful) and the path to the new entrypoint
+    public async Task<Installer.InstalledVersion?> InstallUpdate(bool run=false) {
+        // Download zip to temp
+        if (AvailableVersion == null) {
+            throw new InvalidOperationException("There is no new version to upgrade to.");
+        }
+        string downloadUri = Utils.ExpandVersion(_config.UpdateLocationTemplate, AvailableVersion);
+        string destination = Utils.ExpandVersion(_config.InstallFolderTemplate, AvailableVersion);
+
+        using var stream = await Utils.DownloadFileAsync(new Uri(downloadUri));
+        var tempFileName = Path.GetTempFileName();
+        using var tempFile = File.OpenWrite(tempFileName);
+        await stream.CopyToAsync(tempFile);
+
+        // Unzip on background thread
+        await Task.Factory.StartNew(() => ZipFile.ExtractToDirectory(tempFileName, destination));
+
+        var entryPoint = Path.Combine(destination, _config.EntryPoint)
+        if (run) {
+            // System.Diagnostics.Process.Start(new 
+        }
+
+        // Uncompress to new target directory
+        // Create/Update links
+        return new InstalledVersion {
+            Version = AvailableVersion,
+            EntryPoint = entryPoint
+        };
+    }
+
+    public async Task<Version?> InstallUpdateIfAvailable() {
+        if (AvailableVersion == null) {
+            await CheckforUpdate();
+        }
+        if (AvailableVersion != null && AvailableVersion > CurrentVersion) {
+            await InstallUpdate();
+        }
+        return null;
+    }
 
     #region private methods
 
-    private void log_info(string msg) { }
-    private void log_error(string msg) { }
-    
-    private void UpdateCurrentVersion() {
-        // Check version.txt in install path root
-        // Set CurrentVersion
-        throw new NotImplementedException();
+    private void log_error(string msg) {
+        OnError?.Invoke(msg);
     }
+
+    internal static Exception? ValidateConfig(InstallerConfig config) {
+        if (!Path.IsPathFullyQualified(Utils.ExpandUser(config.InstallBasePath))) {
+            return new ArgumentException("InstallBasePath must be an absolute path");
+        }
+        if (!config.InstallFolderTemplate.Contains("{version}")) {
+            return new ArgumentException("InstalleFolderTemplate must contain the version replacement token {version}");
+        }
+        return null;
+    }
+    
+    // Decided to use the assembly version instead. It's probably good practice to use that
+    // internal static Version? ReadCurrentVersion(string basePath) {
+    //     var currentVersionFile = Path.Combine(basePath, "version.txt");
+    //     if (File.Exists(currentVersionFile)) {
+    //         var text = File.ReadAllText(currentVersionFile);
+    //         return Utils.parseVersion(text);
+    //     }
+    //     return null;
+    // }
 
 
     private Version? parseVersionFromString(string data) {
@@ -71,6 +134,23 @@ public class Installer
 
     #endregion
 
+}
+
+internal static class InstallerConfigUtils {
+    public static InstallerConfig ExpandUser(this InstallerConfig config) {
+        if (config.InstallBasePath.Contains("~")) {
+            return config with { InstallBasePath = Utils.ExpandUser(config.InstallBasePath) };
+        }
+        return config;
+    }
+
+    public static InstallerConfig EnsureVersion(this InstallerConfig config) {
+        if (config.CurrentVersion == null) {
+            var currentVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+            return config with { CurrentVersion = currentVersion };
+        }
+        return config;
+    }
 }
 
 internal static class Utils
@@ -102,12 +182,16 @@ internal static class Utils
         }
     }
 
-    public static async Task<StreamReader> DownloadFileAsync(Uri uri) {
+    public static async Task<Stream> DownloadFileAsync(Uri uri) {
         using var httpClient = new HttpClient();
         var request = new HttpRequestMessage(HttpMethod.Get, uri);
         var response = await httpClient.SendAsync(request);
-        return new StreamReader(await response.Content.ReadAsStreamAsync());
-        // var body = reader.ReadToend();
+        return await response.Content.ReadAsStreamAsync();
     }
+}
 
+internal static class ExtensionMethods {
+    public static void Throw(this Exception e) {
+        throw e;
+    }
 }

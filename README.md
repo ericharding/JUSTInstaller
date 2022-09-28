@@ -13,8 +13,10 @@ Cross platform installer that values sipmlicity.
     The name of an executable to run directly after install. Like EntryPoint, `.exe` will be appended as necessary.
 
 
-* InstallPathTemplate  
-    Where on the filesystem you want the application to be installed. For example `~/.apps/myApp_{version}/` or `c:/program files/MyApp/MyApp_v{version}`
+* InstallBasePath / InstallFolderTemplate
+    Where on the filesystem you want the application to be installed. 
+    For example { InstallBasePath=`~/.apps/myapp/`, InstallFolderTemplate=`myApp_{version}`} 
+                { InstallBasePath=`c:\program files\MyApp`, InstallFolderTemplate=`/MyApp_v{version}` }
 
 * CurrentVersionUri  
     This is how we check for updates.  Send a GET request to the given URI and get back the result text.  (This is probably just a file on your webserver.) Assume the first line of the result is a version number and parse it. Compare against the current version.  If the downloaded file is larger get that version from the UpdateLocationTemplate.  
@@ -42,19 +44,34 @@ var platform = System.Environment.OSVersion.Platform switch {
 config.UpdateLocationTemplate = $"https://example.com/downloads/myapp_{{version}}_{platform}";
 ```
 
-## Hey! Why doesn't this installer force you to install into the standard, recommended, install locations? 
+## How do I set the current version for my application?
 
-It does, man. You just have to tell it where that is.
+Set ```<Version>1.2.3</Version>``` in your csproj or supply it as a build parameter with ```/p:Version=1.2.3```
+
+## What if the version of my application doesn't match the version from my {CurrentVersionUri}?
+
+If your version is lower than {CurrentVersionUri} the application will *always* try to update. If your version is equal or higher it will never update.
+
+## Hey! Why doesn't this installer install into the standard, recommended, install locations for the given platform? 
+
+Dude, it does. You just have to tell it where that is.
 
 ## I changed my shortcuts and I need this version to remove the old shortcut location
 
-No built in support but you could use `PostInstall`.
+No built in support but you can do things in the OnFirstRun event handler which gets executed after an upgrade.
 
-## Can PostInstall be a script?
+## I'd like my application to install into a priveledged location like c:/program files/
 
-Sure. Just be careful if you're installing on multiple platforms. 
+First, it's probably easier to just install per-user. However, if you want to you can accomplish this one of two ways.  
+
+1. Using application manifests which require elevated priveledges. ```<requestedExecutionLevel level="requireAdministrator" uiAccess="false" />```.  As a warning, this functionality isn't uniformly supported cross platform.  
+
+2. When Installer.CheckForUpdate() returns true spawn a separate process under platform specific elelvation. Have that process call the installer to do the update.
 
 ## I'd like to be able to uninstall my app using my favorite system control panel applet.
 
 I'd like a pony.
 
+# Design Notes
+
+* The installed application is an unziped zip file into {InstallBaesPath}/{InstallFolderTemplate}.
