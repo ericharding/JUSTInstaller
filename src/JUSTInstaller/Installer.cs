@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using System.IO;
+using System.Diagnostics;
 using System.IO.Compression;
 
 namespace JUSTInstaller;
@@ -52,14 +53,10 @@ public class Installer
         return false;
     }
 
-    public class InstalledVersion {
-        public Version Version { get; init; }
-        // Path to the newly isntalled executable if you want to run it manually
-        public string EntryPoint { get; init; }
-    };
+    public record class InstalledVersion(Version Version, string EntryPoint);
 
     // Returns the installed version (if successful) and the path to the new entrypoint
-    public async Task<Installer.InstalledVersion?> InstallUpdate(bool run=false) {
+    public async Task<Installer.InstalledVersion?> InstallUpdate(bool run=false, string runArgs="") {
         // Download zip to temp
         if (AvailableVersion == null) {
             throw new InvalidOperationException("There is no new version to upgrade to.");
@@ -75,17 +72,17 @@ public class Installer
         // Unzip on background thread
         await Task.Factory.StartNew(() => ZipFile.ExtractToDirectory(tempFileName, destination));
 
-        var entryPoint = Path.Combine(destination, _config.EntryPoint)
+        var entryPoint = Path.Combine(destination, _config.EntryPoint);
         if (run) {
-            // System.Diagnostics.Process.Start(new 
+            Process.Start(new ProcessStartInfo(entryPoint, runArgs));
         }
 
         // Uncompress to new target directory
         // Create/Update links
-        return new InstalledVersion {
-            Version = AvailableVersion,
-            EntryPoint = entryPoint
-        };
+        return new InstalledVersion( 
+            Version: AvailableVersion,
+            EntryPoint: entryPoint
+         );
     }
 
     public async Task<Version?> InstallUpdateIfAvailable() {
@@ -100,7 +97,7 @@ public class Installer
 
     #region private methods
 
-    private void log_error(string msg) {
+    private void log_error(string msg)  {
         OnError?.Invoke(msg);
     }
 
@@ -156,7 +153,7 @@ internal static class InstallerConfigUtils {
 internal static class Utils
 {
     public static string ExpandUser(string path) {
-        if (!Path.IsPathFullyQualified(path) && path.IndexOf('~') > 0) {
+        if (!Path.IsPathFullyQualified(path) && path.IndexOf('~') >= 0) {
             return path.Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
         }
         return path;

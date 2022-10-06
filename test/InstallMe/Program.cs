@@ -19,13 +19,16 @@ static async Task main()
         Console.WriteLine($"Yes - {installer.AvailableVersion}");
     } else { Console.WriteLine("No"); }
 
-    Console.WriteLine("Update now?");
     var resp = Prompt("Update now?", "y", "n");
     if (resp == "y") {
-        // installer.ins
+        await installer.InstallUpdate(true);
+        Environment.Exit(0);
     }
 
-
+    bool running = true;
+    while(running) {
+        running = Prompt("Quit?", "y", "n") == "n";
+    }
 }
 
 static string Prompt(string prompt, params string[] options) {
@@ -34,7 +37,7 @@ static string Prompt(string prompt, params string[] options) {
     while(!options.Contains(ans)) {
         ans = Console.ReadLine();
     }
-    return ans;
+    return ans!;
 }
 
 
