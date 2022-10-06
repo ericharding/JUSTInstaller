@@ -63,21 +63,22 @@ public class Installer
             throw new InvalidOperationException("There is no new version to upgrade to.");
         }
         string downloadUri = Utils.ExpandVersion(_config.UpdateLocationTemplate, AvailableVersion);
-        string destination = Utils.ExpandVersion(_config.InstallFolderTemplate, AvailableVersion);
+        string destinationFolder = Utils.ExpandVersion(_config.InstallFolderTemplate, AvailableVersion);
+        string destination = Path.Combine(_config.InstallBasePath, destinationFolder);
 
         log_info($"Downloading {downloadUri}");
 
-        using var stream = await Utils.DownloadFileAsync(new Uri(downloadUri));
-        var tempFileName = Path.GetTempFileName();
-        using var tempFile = File.OpenWrite(tempFileName);
-        await stream.CopyToAsync(tempFile);
 
-        log_info($"Installing to {destination}. Unzipping");
+        var tempFileName = await Utils.DownloadToTempFile(new Uri(downloadUri));
+        log_info($"Unzipping {tempFileName} to {destination}. Unzipping");
 
         // Unzip on background thread
         await Task.Factory.StartNew(() => ZipFile.ExtractToDirectory(tempFileName, destination));
 
         var entryPoint = Path.Combine(destination, _config.EntryPoint);
+        if (Utils.IsWindows && File.Exists(entryPoint + ".exe")) {
+            entryPoint += ".exe";
+        }
         if (run) {
             log_info($"Running {entryPoint}");
             Process.Start(new ProcessStartInfo(entryPoint, runArgs));
@@ -182,6 +183,14 @@ internal static class Utils
         var request = new HttpRequestMessage(HttpMethod.Get, uri);
         var response = await httpClient.SendAsync(request);
         return await response.Content.ReadAsStreamAsync();
+    }
+
+    public static async Task<string> DownloadToTempFile(Uri downloadUri) {
+        using var stream = await Utils.DownloadFileAsync(downloadUri);
+        var tempFileName = Path.GetTempFileName();
+        using var tempFile = File.OpenWrite(tempFileName);
+        await stream.CopyToAsync(tempFile);
+        return tempFileName;
     }
 }
 
