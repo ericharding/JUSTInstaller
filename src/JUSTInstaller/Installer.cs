@@ -142,7 +142,7 @@ internal static class InstallerConfigUtils {
 
     public static InstallerConfig EnsureVersion(this InstallerConfig config) {
         if (config.CurrentVersion == null) {
-            var currentVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+            var currentVersion = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version;
             return config with { CurrentVersion = currentVersion };
         }
         return config;
