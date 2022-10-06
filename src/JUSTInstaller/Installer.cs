@@ -37,6 +37,7 @@ public class Installer
     public Version? AvailableVersion { get; set; }
 
     public event Action<string>? OnError;
+    public event Action<string>? OnInfo;
 
     public async Task<bool> CheckforUpdate() {
         var reader = new StreamReader(await Utils.DownloadFileAsync(_config.CurrentVersionUri));
@@ -64,16 +65,21 @@ public class Installer
         string downloadUri = Utils.ExpandVersion(_config.UpdateLocationTemplate, AvailableVersion);
         string destination = Utils.ExpandVersion(_config.InstallFolderTemplate, AvailableVersion);
 
+        log_info($"Downloading {downloadUri}");
+
         using var stream = await Utils.DownloadFileAsync(new Uri(downloadUri));
         var tempFileName = Path.GetTempFileName();
         using var tempFile = File.OpenWrite(tempFileName);
         await stream.CopyToAsync(tempFile);
+
+        log_info($"Installing to {destination}. Unzipping");
 
         // Unzip on background thread
         await Task.Factory.StartNew(() => ZipFile.ExtractToDirectory(tempFileName, destination));
 
         var entryPoint = Path.Combine(destination, _config.EntryPoint);
         if (run) {
+            log_info($"Running {entryPoint}");
             Process.Start(new ProcessStartInfo(entryPoint, runArgs));
         }
 
@@ -100,6 +106,9 @@ public class Installer
     private void log_error(string msg)  {
         OnError?.Invoke(msg);
     }
+    private void log_info(object msg) {
+        OnInfo?.Invoke(msg?.ToString() ?? "");
+    }
 
     internal static Exception? ValidateConfig(InstallerConfig config) {
         if (!Path.IsPathFullyQualified(Utils.ExpandUser(config.InstallBasePath))) {
@@ -111,17 +120,6 @@ public class Installer
         return null;
     }
     
-    // Decided to use the assembly version instead. It's probably good practice to use that
-    // internal static Version? ReadCurrentVersion(string basePath) {
-    //     var currentVersionFile = Path.Combine(basePath, "version.txt");
-    //     if (File.Exists(currentVersionFile)) {
-    //         var text = File.ReadAllText(currentVersionFile);
-    //         return Utils.parseVersion(text);
-    //     }
-    //     return null;
-    // }
-
-
     private Version? parseVersionFromString(string data) {
         // Grab text until the first whitespace character (\n is whitespace)
         var firstToken = String.Concat(data.TakeWhile(ch => !Char.IsWhiteSpace(ch)));

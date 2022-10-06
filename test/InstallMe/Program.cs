@@ -12,6 +12,9 @@ static async Task main()
         CurrentVersionUri:new Uri("http://digitalsorcery.net/InstallMe/version.txt"), 
         UpdateLocationTemplate:"http://digitalsorcery.net/InstallMe/download/InstallMe_{version}.zip"));
 
+    installer.OnError += Console.WriteLine;
+    installer.OnInfo += Console.WriteLine;
+
     Console.WriteLine($"Current version {installer.CurrentVersion}");
     Console.Write($"Update available? ");
     bool updateAvailable = await installer.CheckforUpdate();
