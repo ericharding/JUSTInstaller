@@ -62,12 +62,12 @@ public class Installer
         if (AvailableVersion == null) {
             throw new InvalidOperationException("There is no new version to upgrade to.");
         }
-        string downloadUri = Utils.ExpandVersion(_config.UpdateLocationTemplate, AvailableVersion);
-        string destinationFolder = Utils.ExpandVersion(_config.InstallFolderTemplate, AvailableVersion);
-        string destination = Path.Combine(_config.InstallBasePath, destinationFolder);
 
+        string downloadUri = Utils.ExpandVersion(_config.UpdateLocationTemplate, AvailableVersion);
         log_info($"Downloading {downloadUri}");
 
+        string destinationFolder = Utils.ExpandVersion(_config.InstallFolderTemplate, AvailableVersion);
+        string destination = Path.Combine(_config.InstallBasePath, destinationFolder);
 
         var tempFileName = await Utils.DownloadToTempFile(new Uri(downloadUri));
         log_info($"Unzipping {tempFileName} to {destination}. Unzipping");
@@ -76,20 +76,33 @@ public class Installer
         await Task.Factory.StartNew(() => ZipFile.ExtractToDirectory(tempFileName, destination));
 
         var entryPoint = Path.Combine(destination, _config.EntryPoint);
-        if (Utils.IsWindows && File.Exists(entryPoint + ".exe")) {
-            entryPoint += ".exe";
-        }
+        entryPoint = Utils.TryOsSpecificExpansion(entryPoint);
         if (run) {
             log_info($"Running {entryPoint}");
             Process.Start(new ProcessStartInfo(entryPoint, runArgs));
         }
 
-        // Uncompress to new target directory
         // Create/Update links
+        CreateLinks(entryPoint);
+
         return new InstalledVersion( 
             Version: AvailableVersion,
             EntryPoint: entryPoint
          );
+    }
+
+    private void CreateLinks(string entryPoint)
+    {
+        foreach (var link in _config.WindowsShortcutPaths ?? Enumerable.Empty<string>()) {
+            var shortcut = new WindowsShortcutFactory.WindowsShortcut() {
+                Path = entryPoint
+            };
+            shortcut.Save(Utils.AddExtensionIfNotPresent(link, ".lnk"));
+        }
+
+        foreach (var link in _config.SymlinksPaths ?? Enumerable.Empty<string>()) {
+            Directory.CreateSymbolicLink(link, entryPoint);
+        }
     }
 
     public async Task<Version?> InstallUpdateIfAvailable() {
@@ -191,6 +204,28 @@ internal static class Utils
         using var tempFile = File.OpenWrite(tempFileName);
         await stream.CopyToAsync(tempFile);
         return tempFileName;
+    }
+
+    internal static string TryOsSpecificExpansion(string entryPoint)
+    {
+        if (IsWindows) {
+            string entrypointWithExtension = AddExtensionIfNotPresent(entryPoint, ".exe");
+            if (File.Exists(entrypointWithExtension)) {
+                return entrypointWithExtension;
+            }
+        }
+        return entryPoint;
+    }
+
+    public static string AddExtensionIfNotPresent(string path, string extension) {
+        if (!path.EndsWith(extension)) {
+            if (extension.StartsWith(".")) {
+                return $"{path}{extension}";
+            } else {
+                return $"{path}.{extension}";
+            }
+        }
+        return path;
     }
 }
 
