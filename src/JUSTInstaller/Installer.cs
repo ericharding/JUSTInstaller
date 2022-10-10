@@ -73,7 +73,10 @@ public class Installer
         log_info($"Unzipping {tempFileName} to {destination}. Unzipping");
 
         // Unzip on background thread
-        await Task.Factory.StartNew(() => ZipFile.ExtractToDirectory(tempFileName, destination));
+        await Task.Factory.StartNew(() => {
+            RemoveIfExists(destination);
+            ZipFile.ExtractToDirectory(tempFileName, destination); 
+        });
 
         var entryPoint = Path.Combine(destination, _config.EntryPoint);
         entryPoint = Utils.TryOsSpecificExpansion(entryPoint);
@@ -91,23 +94,25 @@ public class Installer
          );
     }
 
+    private void RemoveIfExists(string destination) {
+        if (Directory.Exists(destination)) {
+            var backupDirectory = $"{destination}_backup";
+            log_info($"{destination} already exists. Moving to {backupDirectory}");
+            if (Directory.Exists(backupDirectory)) {
+                log_info($"{backupDirectory}, also already exists. Removing.");
+                Directory.Delete(backupDirectory, true);
+            }
+            Directory.Move(destination, backupDirectory);
+        }
+    }
+
     private void CreateLinks(string entryPoint) {
         foreach (var link in _config.WindowsShortcutPaths ?? Enumerable.Empty<string>()) {
-            var result = Utils.TryCreateWindowsShortcut(link, entryPoint);
-            if (!result) {
-                log_error($"Failed to create shortcut {link}");
-            } else {
-                log_info($"Created shortcut {link} to {entryPoint}");
-            }
+            TryCreateWindowsShortcut(link, entryPoint);
         }
 
         foreach (var link in _config.SymlinksPaths ?? Enumerable.Empty<string>()) {
-            var result = Utils.CreateSymLink(link, entryPoint);
-            if (result == null) {
-                log_error($"Failed to create symlink {link}");
-            } else {
-                log_info($"Created symlink {link} to {entryPoint}");
-            }
+            TryCreateSymLink(link, entryPoint);
         }
     }
 
@@ -144,6 +149,37 @@ public class Installer
         // Grab text until the first whitespace character (\n is whitespace)
         var firstToken = String.Concat(data.TakeWhile(ch => !Char.IsWhiteSpace(ch)));
         return Utils.parseVersion(firstToken);
+    }
+
+    private bool TryCreateSymLink(string link, string dest) {
+        try {
+            var linkPath = link.ExpandUser();
+            if (File.Exists(linkPath)) {
+                log_info($"Symlink {linkPath} already exists. Overwriting.");
+                File.Delete(linkPath);
+            }
+            Directory.CreateDirectory(new FileInfo(linkPath).DirectoryName ?? "");
+            Directory.CreateSymbolicLink(link.ExpandUser(), dest);
+            log_info($"Created symlink {link} to {dest}");
+            return true;
+        } catch (Exception e) {
+            log_error($"Failed to create symlink {link}. {e}");
+            return false;
+        }
+    }
+
+    private object TryCreateWindowsShortcut(string link, string dest) {
+        try {
+            var shortcut = new WindowsShortcutFactory.WindowsShortcut() {
+                Path = dest
+            };
+            shortcut.Save(Utils.AddExtensionIfNotPresent(link.ExpandUser(), ".lnk"));
+            log_info($"Created shortcut {link} to {dest}");
+            return true;
+        } catch(Exception e)  {
+            log_error($"Failed to create shortcut {link}. {e}");
+            return false;
+        }
     }
 
 
@@ -234,27 +270,6 @@ internal static class Utils
         return path;
     }
 
-    internal static FileSystemInfo? CreateSymLink(string link, string dest) {
-        try {
-            var linkPath = link.ExpandUser();
-            Directory.CreateDirectory(new FileInfo(linkPath).DirectoryName ?? "");
-            return Directory.CreateSymbolicLink(link.ExpandUser(), dest);
-        } catch {
-            return null;
-        }
-    }
-
-    internal static bool TryCreateWindowsShortcut(string link, string dest) {
-        try {
-            var shortcut = new WindowsShortcutFactory.WindowsShortcut() {
-                Path = dest
-            };
-            shortcut.Save(Utils.AddExtensionIfNotPresent(link.ExpandUser(), ".lnk"));
-            return true;
-        } catch {
-            return false;
-        }
-    }
 }
 
 internal static class ExtensionMethods {
