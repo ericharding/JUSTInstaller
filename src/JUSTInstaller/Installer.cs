@@ -80,13 +80,13 @@ public class Installer
 
         var entryPoint = Path.Combine(destination, _config.EntryPoint);
         entryPoint = Utils.TryOsSpecificExpansion(entryPoint);
+
+        CreateLinks(entryPoint);
+
         if (run) {
             log_info($"Running {entryPoint}");
             Process.Start(new ProcessStartInfo(entryPoint, runArgs));
         }
-
-        // Create/Update links
-        CreateLinks(entryPoint);
 
         return new InstalledVersion( 
             Version: AvailableVersion,
