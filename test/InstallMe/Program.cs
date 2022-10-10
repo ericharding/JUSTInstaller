@@ -31,7 +31,7 @@ static async Task main()
 
     var resp = Prompt("Update now?", "y", "n");
     if (resp == "y") {
-        await installer.InstallUpdate(false);
+        await installer.InstallUpdate(run:false);
         Environment.Exit(0);
     }
 
@@ -47,8 +47,7 @@ static string Prompt(string prompt, params string[] options) {
     while(!options.Contains(ans)) {
         try {
             ans = Console.ReadLine();
-        } catch (IOException e) {
-            Console.WriteLine(e);
+        } catch (IOException) {
             break;
         }
     }
