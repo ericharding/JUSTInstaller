@@ -17,7 +17,7 @@ public record class InstallerConfig(
     Uri CurrentVersionUri, // where to check for a new version
     string UpdateLocationTemplate, // Where to get the new zip
     Version? CurrentVersion = null, // If null we use the version from assemblyinfo
-    uint KeepVersion = 2, // How many old version to keep
+    uint KeepVersion = 2, // How many old version to keep (not implemented)
     IEnumerable<string>? WindowsShortcutPaths = null,
     IEnumerable<string>? SymlinksPaths = null
     );
@@ -91,17 +91,23 @@ public class Installer
          );
     }
 
-    private void CreateLinks(string entryPoint)
-    {
+    private void CreateLinks(string entryPoint) {
         foreach (var link in _config.WindowsShortcutPaths ?? Enumerable.Empty<string>()) {
-            var shortcut = new WindowsShortcutFactory.WindowsShortcut() {
-                Path = entryPoint
-            };
-            shortcut.Save(Utils.AddExtensionIfNotPresent(link, ".lnk"));
+            var result = Utils.TryCreateWindowsShortcut(link, entryPoint);
+            if (!result) {
+                log_error($"Failed to create shortcut {link}");
+            } else {
+                log_info($"Created shortcut {link} to {entryPoint}");
+            }
         }
 
         foreach (var link in _config.SymlinksPaths ?? Enumerable.Empty<string>()) {
-            Directory.CreateSymbolicLink(link, entryPoint);
+            var result = Utils.CreateSymLink(link, entryPoint);
+            if (result == null) {
+                log_error($"Failed to create symlink {link}");
+            } else {
+                log_info($"Created symlink {link} to {entryPoint}");
+            }
         }
     }
 
@@ -164,14 +170,14 @@ internal static class InstallerConfigUtils {
 
 internal static class Utils
 {
-    public static string ExpandUser(string path) {
+    public static string ExpandUser(this string path) {
         if (!Path.IsPathFullyQualified(path) && path.IndexOf('~') >= 0) {
             return path.Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
         }
         return path;
     }
 
-    public static string ExpandVersion(string path, Version version) {
+    public static string ExpandVersion(this string path, Version version) {
         return path.Replace("{version}", version.ToString());
     }
 
@@ -226,6 +232,28 @@ internal static class Utils
             }
         }
         return path;
+    }
+
+    internal static FileSystemInfo? CreateSymLink(string link, string dest) {
+        try {
+            var linkPath = link.ExpandUser();
+            Directory.CreateDirectory(new FileInfo(linkPath).DirectoryName ?? "");
+            return Directory.CreateSymbolicLink(link.ExpandUser(), dest);
+        } catch {
+            return null;
+        }
+    }
+
+    internal static bool TryCreateWindowsShortcut(string link, string dest) {
+        try {
+            var shortcut = new WindowsShortcutFactory.WindowsShortcut() {
+                Path = dest
+            };
+            shortcut.Save(Utils.AddExtensionIfNotPresent(link.ExpandUser(), ".lnk"));
+            return true;
+        } catch {
+            return false;
+        }
     }
 }
 
