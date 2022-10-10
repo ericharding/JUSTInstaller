@@ -107,8 +107,10 @@ public class Installer
     }
 
     private void CreateLinks(string entryPoint) {
-        foreach (var link in _config.WindowsShortcutPaths ?? Enumerable.Empty<string>()) {
-            TryCreateWindowsShortcut(link, entryPoint);
+        if (Utils.IsWindows) {
+            foreach (var link in _config.WindowsShortcutPaths ?? Enumerable.Empty<string>()) {
+                TryCreateWindowsShortcut(link, entryPoint);
+            }
         }
 
         foreach (var link in _config.SymlinksPaths ?? Enumerable.Empty<string>()) {
