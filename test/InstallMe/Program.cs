@@ -32,7 +32,6 @@ static async Task main()
     var resp = Prompt("Update now?", "y", "n");
     if (resp == "y") {
         await installer.InstallUpdate(run:false);
-        Environment.Exit(0);
     }
 
     bool running = true;
