@@ -11,13 +11,13 @@ namespace JUSTInstaller;
 
 
 public record class InstallerConfig(
-    string EntryPoint,  // Application entrypoint
+    string EntryPoint,  // Application entrypoint without path
     string InstallBasePath, // Root path where different versions get installed. A version.txt will be created here.
     string InstallFolderTemplate, // Name of the installed app folder relative to InstallFolderbase. Must include {version}
     Uri CurrentVersionUri, // where to check for a new version
     string UpdateLocationTemplate, // Where to get the new zip
     Version? CurrentVersion = null, // If null we use the version from assemblyinfo
-    uint KeepVersion = 2, // How many old version to keep (not implemented)
+    uint KeepVersion = 1, // How many old version to keep (not implemented)
     IEnumerable<string>? WindowsShortcutPaths = null,
     IEnumerable<string>? SymlinksPaths = null
     );
@@ -55,6 +55,8 @@ public class Installer
     }
 
     public record class InstalledVersion(Version Version, string EntryPoint);
+
+    public bool IsfirstRunOnCurrentVersion { get { throw new NotImplementedException(); }}
 
     // Returns the installed version (if successful) and the path to the new entrypoint
     public async Task<Installer.InstalledVersion?> InstallUpdate(bool run=false, string runArgs="") {
@@ -94,6 +96,25 @@ public class Installer
          );
     }
 
+    public async Task<InstalledVersion?> InstallUpdateIfAvailable(bool run=true) {
+        if (AvailableVersion == null) {
+            await CheckforUpdate();
+        }
+        if (AvailableVersion != null && AvailableVersion > CurrentVersion) {
+            return await InstallUpdate(run);
+        }
+        return null;
+    }
+
+    #region private methods
+
+    private void log_error(string msg)  {
+        OnError?.Invoke(msg);
+    }
+    private void log_info(object msg) {
+        OnInfo?.Invoke(msg?.ToString() ?? "");
+    }
+
     private void RemoveIfExists(string destination) {
         if (Directory.Exists(destination)) {
             var backupDirectory = $"{destination}_backup";
@@ -118,24 +139,6 @@ public class Installer
         }
     }
 
-    public async Task<InstalledVersion?> InstallUpdateIfAvailable(bool run=true) {
-        if (AvailableVersion == null) {
-            await CheckforUpdate();
-        }
-        if (AvailableVersion != null && AvailableVersion > CurrentVersion) {
-            return await InstallUpdate(run);
-        }
-        return null;
-    }
-
-    #region private methods
-
-    private void log_error(string msg)  {
-        OnError?.Invoke(msg);
-    }
-    private void log_info(object msg) {
-        OnInfo?.Invoke(msg?.ToString() ?? "");
-    }
 
     internal static Exception? ValidateConfig(InstallerConfig config) {
         if (!Path.IsPathFullyQualified(Utils.ExpandUser(config.InstallBasePath))) {

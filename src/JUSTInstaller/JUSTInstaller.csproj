@@ -10,8 +10,10 @@
   <PropertyGroup>
     <Authors>Eric Harding</Authors>
     <Title>JUST Installer</Title>
-    <Description>A bare bones installer that will unzip your package and create links.</Description>
+    <Description>A bare bones installer. Will check version and download from a URL and unzip into the specified destination.</Description>
     <License>MIT</License>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>install</PackageTags>
     <!-- <ProjectUrl>https://github.com/ericharding/JUSTInstaller</Project> -->
     <!-- <PackageLicenseFile>LICENSE</PackageLicenseFile> -->
   </PropertyGroup>
