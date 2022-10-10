@@ -118,12 +118,12 @@ public class Installer
         }
     }
 
-    public async Task<Version?> InstallUpdateIfAvailable() {
+    public async Task<InstalledVersion?> InstallUpdateIfAvailable(bool run=true) {
         if (AvailableVersion == null) {
             await CheckforUpdate();
         }
         if (AvailableVersion != null && AvailableVersion > CurrentVersion) {
-            await InstallUpdate();
+            return await InstallUpdate(run);
         }
         return null;
     }
