@@ -272,10 +272,8 @@ internal static class Utils
         return path;
     }
 
-}
-
-internal static class ExtensionMethods {
     public static void Throw(this Exception e) {
         throw e;
     }
+
 }
