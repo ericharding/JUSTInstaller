@@ -2,7 +2,7 @@
 
 set -e
 
-cw $(dirname $0)
+cd $(dirname $0)
 
 VERSION=$(cat InstallMe.csproj | grep Version | egrep -o "[0-9]+\.[0-9]+\.[0-9]+")
 

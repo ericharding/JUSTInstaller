@@ -1,5 +1,5 @@
 ﻿using JUSTInstaller;
-
+using static System.Environment;
 
 await main();
 
@@ -11,9 +11,13 @@ static async Task main()
         InstallFolderTemplate:"version_{version}",
         CurrentVersionUri:new Uri("http://digitalsorcery.net/InstallMe/version.txt"), 
         UpdateLocationTemplate:"http://digitalsorcery.net/InstallMe/download/InstallMe_{version}.zip",
+        // WindowsShortcutPaths are automatically ignored if not installing to Windows
+        WindowsShortcutPaths: new [] {
+            Path.Combine(Environment.GetFolderPath(SpecialFolder.Desktop), "InstallMe")
+        },
+        // SymlinkPaths are created on all platforms
         SymlinksPaths: new[] { "~/bin/installme" }
-        ));
-
+    ));
 
     installer.OnError += Console.WriteLine;
     installer.OnInfo += Console.WriteLine;
