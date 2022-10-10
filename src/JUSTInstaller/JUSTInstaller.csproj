@@ -7,6 +7,15 @@
     <Version>0.0.1</Version>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <Authors>Eric Harding</Authors>
+    <Title>JUST Installer</Title>
+    <Description>A bare bones installer that will unzip your package and create links.</Description>
+    <License>MIT</License>
+    <!-- <ProjectUrl>https://github.com/ericharding/JUSTInstaller</Project> -->
+    <!-- <PackageLicenseFile>LICENSE</PackageLicenseFile> -->
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="WindowsShortcutFactory" Version="1.1.0" />
   </ItemGroup>
