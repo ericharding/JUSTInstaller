@@ -4,7 +4,7 @@ set -e
 
 cd $(dirname $0)
 
-VERSION=$(cat InstallMe.csproj | grep Version | egrep -o "[0-9]+\.[0-9]+\.[0-9]+")
+VERSION=$(cat JUSTInstaller.csproj | grep \<Version\> | egrep -o "[0-9]+\.[0-9]+\.[0-9]+")
 
 dotnet build -c release
 
