@@ -18,16 +18,16 @@ public record class InstallerConfig(
     string UpdateLocationTemplate, // Where to get the new zip
     Version? CurrentVersion = null, // If null we use the version from assemblyinfo
     uint KeepVersion = 1, // How many old version to keep (not implemented)
+    string? SettingsPath = null, // Path to store settings. Defaults to InstallBasePath/settings/
     IEnumerable<string>? WindowsShortcutPaths = null,
     IEnumerable<string>? SymlinksPaths = null
     );
 
-public class Installer
-{
+public class Installer {
     private InstallerConfig _config;
 
     public Installer(InstallerConfig config) {
-        _config = config.ExpandUser().EnsureVersion();
+        _config = config.ExpandUser().EnsureVersion().EnsureDefaults();
         ValidateConfig(_config)?.Throw();
     }
 
@@ -56,10 +56,54 @@ public class Installer
 
     public record class InstalledVersion(Version Version, string EntryPoint);
 
-    public bool IsfirstRunOnCurrentVersion { get { throw new NotImplementedException(); }}
+    private static bool? _isfirstRunOnCurrentVersion = false;
+    public bool IsfirstRunOnCurrentVersion {
+        get {
+            if (_isfirstRunOnCurrentVersion.HasValue) {
+                return _isfirstRunOnCurrentVersion.Value;
+            }
+
+            // White lie - This only checks if this is the firs time this accessor is called while running this version of the app
+
+            if (string.IsNullOrEmpty(_config.SettingsPath)) {
+                log_error("SettingsPath is null or empty. It must be non-empty and the current user must have write permission to use IsfirstRunOnCurrentVersion");
+            }
+            string settingsPath = _config.SettingsPath!;
+            if (!Directory.Exists(settingsPath)) {
+                Directory.CreateDirectory(settingsPath);
+            }
+            var localVersionPath = Path.Combine(settingsPath, "current_version.txt");
+            Version? readSavedLocalVersion() {
+                try {
+                    if (File.Exists(localVersionPath)) {
+                        return parseVersionFromString(File.ReadAllText(localVersionPath));
+                    }
+                } catch (Exception e) {
+                    log_error($"Exception reading current version. {e}");
+                }
+                return null;
+            }
+            void saveCurrentVersion() {
+                try {
+                    File.WriteAllText(localVersionPath, CurrentVersion?.ToString());
+                } catch (Exception e) {
+                    log_error($"Exception saving current version. {e}");
+
+                }
+            }
+
+            var currentVersion = readSavedLocalVersion();
+            _isfirstRunOnCurrentVersion = currentVersion != CurrentVersion;
+            if (_isfirstRunOnCurrentVersion.Value == true) {
+                saveCurrentVersion();
+            }
+
+            return _isfirstRunOnCurrentVersion.Value;
+        }
+    }
 
     // Returns the installed version (if successful) and the path to the new entrypoint
-    public async Task<Installer.InstalledVersion?> InstallUpdate(bool run=false, string runArgs="") {
+    public async Task<Installer.InstalledVersion?> InstallUpdate(bool run = false, string runArgs = "") {
         // Download zip to temp
         if (AvailableVersion == null) {
             throw new InvalidOperationException("There is no new version to upgrade to.");
@@ -77,7 +121,7 @@ public class Installer
         // Unzip on background thread
         await Task.Factory.StartNew(() => {
             RemoveIfExists(destination);
-            ZipFile.ExtractToDirectory(tempFileName, destination); 
+            ZipFile.ExtractToDirectory(tempFileName, destination);
         });
 
         var entryPoint = Path.Combine(destination, _config.EntryPoint);
@@ -90,13 +134,13 @@ public class Installer
             Process.Start(new ProcessStartInfo(entryPoint, runArgs));
         }
 
-        return new InstalledVersion( 
+        return new InstalledVersion(
             Version: AvailableVersion,
             EntryPoint: entryPoint
          );
     }
 
-    public async Task<InstalledVersion?> InstallUpdateIfAvailable(bool run=true) {
+    public async Task<InstalledVersion?> InstallUpdateIfAvailable(bool run = true) {
         if (AvailableVersion == null) {
             await CheckforUpdate();
         }
@@ -108,7 +152,7 @@ public class Installer
 
     #region private methods
 
-    private void log_error(string msg)  {
+    private void log_error(string msg) {
         OnError?.Invoke(msg);
     }
     private void log_info(object msg) {
@@ -149,7 +193,7 @@ public class Installer
         }
         return null;
     }
-    
+
     private Version? parseVersionFromString(string data) {
         // Grab text until the first whitespace character (\n is whitespace)
         var firstToken = String.Concat(data.TakeWhile(ch => !Char.IsWhiteSpace(ch)));
@@ -181,7 +225,7 @@ public class Installer
             shortcut.Save(Utils.AddExtensionIfNotPresent(link.ExpandUser(), ".lnk"));
             log_info($"Created shortcut {link} to {dest}");
             return true;
-        } catch(Exception e)  {
+        } catch (Exception e) {
             log_error($"Failed to create shortcut {link}. {e}");
             return false;
         }
@@ -207,10 +251,17 @@ internal static class InstallerConfigUtils {
         }
         return config;
     }
+
+    public static InstallerConfig EnsureDefaults(this InstallerConfig config) {
+        if (string.IsNullOrEmpty(config.SettingsPath)) {
+            string settingsPath = Path.Join(config.InstallBasePath, "settings");
+            return config with { SettingsPath = settingsPath };
+        }
+        return config;
+    }
 }
 
-internal static class Utils
-{
+internal static class Utils {
     public static string ExpandUser(this string path) {
         if (!Path.IsPathFullyQualified(path) && path.IndexOf('~') >= 0) {
             return path.Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
@@ -253,8 +304,7 @@ internal static class Utils
         return tempFileName;
     }
 
-    internal static string TryOsSpecificExpansion(string entryPoint)
-    {
+    internal static string TryOsSpecificExpansion(string entryPoint) {
         if (IsWindows) {
             string entrypointWithExtension = AddExtensionIfNotPresent(entryPoint, ".exe");
             if (File.Exists(entrypointWithExtension)) {
@@ -268,7 +318,8 @@ internal static class Utils
         if (!path.EndsWith(extension)) {
             if (extension.StartsWith(".")) {
                 return $"{path}{extension}";
-            } else {
+            }
+            else {
                 return $"{path}.{extension}";
             }
         }
