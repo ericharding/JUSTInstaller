@@ -34,6 +34,33 @@ Cross platform installer that values sipmlicity.
 * SymlinksPaths
     Symlinks to the application entrypoint. These will be updated when a new version is installed.
 
+* SettingsPath
+    If you use IsfirstRunOnCurrentVersion we need to create a current_version.txt file and we'll store it in this location. If this is not provided we use InstallBasePath/settings
+
+# Quick Start
+
+```csharp
+using JUSTInstaller;
+var installer = new Installer(new InstallerConfig(
+        EntryPoint: "InstallMe",
+        InstallBasePath: "~/apps/install_me",
+        InstallFolderTemplate: "version_{version}",
+        CurrentVersionUri: new Uri("http://digitalsorcery.net/InstallMe/version.txt"),
+        UpdateLocationTemplate: "http://digitalsorcery.net/InstallMe/download/InstallMe_{version}.zip",
+        WindowsShortcutPaths: new[] {
+            Path.Combine(Environment.GetFolderPath(SpecialFolder.Desktop), "InstallMe")
+        });
+if (await installer.CheckForUpdate()) {
+    // Setting run:true will automatically spawn the newly installed version. If you prefer to lauanch it yourself Process.Start(result.EntryPoint)
+    var result = await installer.InstallUpdate(run: true);
+    if (result != null) {
+        Console.WriteLine($"Installed new version {result.Version}. Installed to {result.EntryPoint}");
+        Application.Exit();
+    }
+}
+
+```
+
 # Recipes / FAQ
 
 ## I want to install on multiple platforms!
@@ -63,6 +90,11 @@ It can! You just have to tell it where that is.
 
 No built in support but you can check IsfirstRunOnCurrentVersion and do some custom cleanup.
 
+
+## I use the registry to run my application on startup. When I install a new version I need to update the registry.
+
+When you call InstallUpdate() and it installs a new version it will return an "entry point" which is the path to the new executable. You can use this to update to the new location.  You could also use IsFirstRunOnCurrentVersion to check on startup if you need to do some cleanup.
+
 ## I'd like my application to install into a priveledged location like c:/program files/
 
 First, it's probably easier to just install per-user. However, if you want to you can accomplish this one of two ways.  
@@ -77,7 +109,7 @@ Not currently.
 
 ## How does IsfirstRunOnCurrentVersion work?
 
-It doesn't. (TODO)
+When you call IsfirstRunOnCurrentVersion it will check for a settings file named current_version.txt. If it doesn't exist or if the version number in that file is not the same as the CurrentVersion it will return true and update current_version.txt to have the currently running version.  No file is created if you never check IsfirstRunOnCurrentVersion.
 
 # Design Notes
 
