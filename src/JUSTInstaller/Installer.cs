@@ -56,7 +56,7 @@ public class Installer {
 
     public record class InstalledVersion(Version Version, string EntryPoint);
 
-    private static bool? _isfirstRunOnCurrentVersion = false;
+    private static bool? _isfirstRunOnCurrentVersion = null;
     public bool IsfirstRunOnCurrentVersion {
         get {
             if (_isfirstRunOnCurrentVersion.HasValue) {
