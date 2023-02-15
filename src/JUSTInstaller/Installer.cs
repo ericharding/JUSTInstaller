@@ -20,7 +20,8 @@ public record class InstallerConfig(
     uint KeepVersion = 1, // How many old version to keep (not implemented)
     string? SettingsPath = null, // Path to store settings. Defaults to InstallBasePath/settings/
     IEnumerable<string>? WindowsShortcutPaths = null,
-    IEnumerable<string>? SymlinksPaths = null
+    IEnumerable<string>? SymlinksPaths = null,
+    TimeSpan HttpTimeout = default
     );
 
 public class Installer {
@@ -40,7 +41,7 @@ public class Installer {
     public event Action<string>? OnInfo;
 
     public async Task<bool> CheckforUpdate() {
-        var reader = new StreamReader(await Utils.DownloadFileAsync(_config.CurrentVersionUri));
+        var reader = new StreamReader(await Utils.DownloadFileAsync(_config.CurrentVersionUri, _config.HttpTimeout).ConfigureAwait(false));
         var data = await reader.ReadToEndAsync();
         var newVersion = parseVersionFromString(data);
         AvailableVersion = newVersion;
@@ -115,14 +116,20 @@ public class Installer {
         string destinationFolder = Utils.ExpandVersion(_config.InstallFolderTemplate, AvailableVersion);
         string destination = Path.Combine(_config.InstallBasePath, destinationFolder);
 
-        var tempFileName = await Utils.DownloadToTempFile(new Uri(downloadUri));
+        string tempFileName;
+        try {
+            tempFileName = await Utils.DownloadToTempFile(new Uri(downloadUri), _config.HttpTimeout).ConfigureAwait(false);
+        } catch(Exception e) {
+            log_error($"Exception downloading {downloadUri}. {e}");
+            return null;
+        }
         log_info($"Unzipping {tempFileName} to {destination}. Unzipping");
 
         // Unzip on background thread
         await Task.Factory.StartNew(() => {
             RemoveIfExists(destination);
             ZipFile.ExtractToDirectory(tempFileName, destination);
-        });
+        }).ConfigureAwait(false);
 
         var entryPoint = Path.Combine(destination, _config.EntryPoint);
         entryPoint = Utils.TryOsSpecificExpansion(entryPoint);
@@ -142,10 +149,10 @@ public class Installer {
 
     public async Task<InstalledVersion?> InstallUpdateIfAvailable(bool run = true) {
         if (AvailableVersion == null) {
-            await CheckforUpdate();
+            await CheckforUpdate().ConfigureAwait(false);
         }
         if (AvailableVersion != null && AvailableVersion > CurrentVersion) {
-            return await InstallUpdate(run);
+            return await InstallUpdate(run).ConfigureAwait(false);
         }
         return null;
     }
@@ -289,18 +296,21 @@ internal static class Utils {
         }
     }
 
-    public static async Task<Stream> DownloadFileAsync(Uri uri) {
+    public static async Task<Stream> DownloadFileAsync(Uri uri, TimeSpan timeout) {
         using var httpClient = new HttpClient();
+        if (timeout != default) {
+            httpClient.Timeout = timeout;
+        }
         var request = new HttpRequestMessage(HttpMethod.Get, uri);
-        var response = await httpClient.SendAsync(request);
-        return await response.Content.ReadAsStreamAsync();
+        var response = await httpClient.SendAsync(request).ConfigureAwait(false);
+        return await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
     }
 
-    public static async Task<string> DownloadToTempFile(Uri downloadUri) {
-        using var stream = await Utils.DownloadFileAsync(downloadUri);
+    public static async Task<string> DownloadToTempFile(Uri downloadUri, TimeSpan timeout) {
+        using var stream = await Utils.DownloadFileAsync(downloadUri, timeout).ConfigureAwait(false);
         var tempFileName = Path.GetTempFileName();
         using var tempFile = File.OpenWrite(tempFileName);
-        await stream.CopyToAsync(tempFile);
+        await stream.CopyToAsync(tempFile).ConfigureAwait(false);
         return tempFileName;
     }
 
