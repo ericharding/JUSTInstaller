@@ -41,18 +41,23 @@ public class Installer {
     public event Action<string>? OnInfo;
 
     public async Task<bool> CheckforUpdate() {
-        var reader = new StreamReader(await Utils.DownloadFileAsync(_config.CurrentVersionUri, _config.HttpTimeout).ConfigureAwait(false));
-        var data = await reader.ReadToEndAsync();
-        var newVersion = parseVersionFromString(data);
-        AvailableVersion = newVersion;
-        if (newVersion == null) {
-            log_error($"Could not parse version from '{data}'");
+        try {
+            var reader = new StreamReader(await Utils.DownloadFileAsync(_config.CurrentVersionUri, _config.HttpTimeout).ConfigureAwait(false));
+            var data = await reader.ReadToEndAsync();
+            var newVersion = parseVersionFromString(data);
+            AvailableVersion = newVersion;
+            if (newVersion == null) {
+                log_error($"Could not parse version from '{data}'");
+                return false;
+            }
+            if (CurrentVersion == null || newVersion > CurrentVersion) {
+                return true;
+            }
+            return false;
+        } catch(Exception e) {
+            log_error($"Exception checking for update from {_config.CurrentVersionUri}. {e}");
             return false;
         }
-        if (CurrentVersion == null || newVersion > CurrentVersion) {
-            return true;
-        }
-        return false;
     }
 
     public record class InstalledVersion(Version Version, string EntryPoint);
