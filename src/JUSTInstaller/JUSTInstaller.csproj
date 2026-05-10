@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFrameworks>net6.0;net6.0-windows</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Version>0.0.4</Version>
@@ -19,7 +19,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="WindowsShortcutFactory" Version="1.2.0" />
+    <PackageReference Include="WindowsShortcutFactory" Version="1.2.0" Condition="'$(TargetFramework)' == 'net6.0-windows'" />
   </ItemGroup>
 
 </Project>
