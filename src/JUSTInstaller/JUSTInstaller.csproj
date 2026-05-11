@@ -14,12 +14,17 @@
     <License>MIT</License>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageTags>install</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <!-- <ProjectUrl>https://github.com/ericharding/JUSTInstaller</Project> -->
     <!-- <PackageLicenseFile>LICENSE</PackageLicenseFile> -->
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="WindowsShortcutFactory" Version="1.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>
