@@ -184,11 +184,13 @@ public class Installer {
     }
 
     private void CreateLinks(string entryPoint) {
+#if NET6_0_WINDOWS
         if (Utils.IsWindows) {
             foreach (var link in _config.WindowsShortcutPaths ?? Enumerable.Empty<string>()) {
                 TryCreateWindowsShortcut(link, entryPoint);
             }
         }
+#endif
 
         foreach (var link in _config.SymlinksPaths ?? Enumerable.Empty<string>()) {
             TryCreateSymLink(link, entryPoint);
@@ -229,6 +231,7 @@ public class Installer {
         }
     }
 
+#if NET6_0_WINDOWS
     private object TryCreateWindowsShortcut(string link, string dest) {
         try {
             var shortcut = new WindowsShortcutFactory.WindowsShortcut() {
@@ -242,6 +245,7 @@ public class Installer {
             return false;
         }
     }
+#endif
 
 
     #endregion
