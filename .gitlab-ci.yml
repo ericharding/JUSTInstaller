@@ -1,0 +1,24 @@
+stages:
+  - build
+  - publish
+
+variables:
+  DOTNET_VERSION: "8.x"
+
+build:
+  stage: build
+  image: mcr.microsoft.com/dotnet/sdk:8.0
+  script:
+    - dotnet restore
+    - dotnet build --no-restore --configuration Release
+    - dotnet test --no-build --configuration Release --verbosity normal
+
+publish-nuget:
+  stage: publish
+  image: mcr.microsoft.com/dotnet/sdk:8.0
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - VERSION=$(echo "$CI_COMMIT_TAG" | sed 's/^v//')
+    - dotnet pack src/JUSTInstaller/JUSTInstaller.csproj --configuration Release -p:Version=$VERSION --output ./artifacts
+    - dotnet nuget push ./artifacts/*.nupkg --api-key $NUGET_API_KEY --source https://api.nuget.org/v3/index.json --skip-duplicate
